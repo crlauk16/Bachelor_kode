@@ -18,7 +18,7 @@ void setup()
 
 for(int i = 0; i < 3; i++)
   {
-    Serial.println(arr[i]);
+    Serial.print(arr[i]);
   }
 }
 
