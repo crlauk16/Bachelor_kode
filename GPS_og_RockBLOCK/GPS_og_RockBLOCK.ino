@@ -19,7 +19,6 @@ SoftwareSerial ss(RXPin, TXPin);
 
 int signalQuality = -1;
 int err;
-int n = 1;
 
 void setup() 
 {
@@ -62,16 +61,16 @@ void setup()
 }
 
 void loop()
-{
-   for (n; n>0 && (gps.location.lat(), 8) > 0; n--)
+{ 
+  while (ss.available() > 0)
+  gps.encode(ss.read());
+    
+  if (gps.location.isUpdated() && gps.sentencesWithFix() == 1) //Checks if there is an update to the data, and if the arduino has recived 1 full scentence.
   {
-    Serial.println(n);
     Serial.print(gps.location.lat(), 8);
-
+    Serial.print(F(","));
+    Serial.print(gps.location.lng(), 8);
   }
-  /*while (ss.available() > 0)
-    if (gps.encode(ss.read()))
-      displayInfo();*/
 }
 
 void displayInfo()
