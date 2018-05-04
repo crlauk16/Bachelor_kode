@@ -28,23 +28,32 @@ void setup()
 
   //Start the serial port connected to the satellite modem
   IridiumSerial.begin(19200);
+}
 
-  // Begin satellite modem operation
-  Serial.println("Starting modem...");
-  err = modem.begin();
-  if (err != ISBD_SUCCESS)
+void loop()
+{ 
+  while (ss.available() > 0)
+  gps.encode(ss.read());
+    
+  if (gps.location.isUpdated() && gps.sentencesWithFix() == 1) //Checks if there is an update to the data, and if the arduino has recived 1 full scentence.
   {
+     Serial.println("Starting modem...");
+      err = modem.begin();
+      if (err != ISBD_SUCCESS)
+    {
     Serial.print("Begin failed: error ");
     Serial.println(err);
     if (err == ISBD_NO_MODEM_DETECTED)
       Serial.println("No modem detected: check wiring.");
     return;
   }
-  
-  //Send the message, vil sende meldingen en gang når jeg vet at jeg har data fra gps.
- 
-    /*Serial.print("Trying to send the message.  This might take several minutes.\r\n");
-    err = modem.sendSBDText("Hello world!");
+    
+    Serial.print(gps.location.lat(), 8);
+    Serial.print(F(","));
+    Serial.print(gps.location.lng(), 8);
+
+    Serial.print("Trying to send the message.  This might take several minutes.\r\n");
+    err = modem.sendSBDText(gps.location.lat());
     if (err != ISBD_SUCCESS)
     {
       Serial.print("sendSBDText failed: error ");
@@ -56,20 +65,7 @@ void setup()
     else
     {
       Serial.println("Hey, it worked!");
-    }*/
-  
-}
-
-void loop()
-{ 
-  while (ss.available() > 0)
-  gps.encode(ss.read());
-    
-  if (gps.location.isUpdated() && gps.sentencesWithFix() == 1) //Checks if there is an update to the data, and if the arduino has recived 1 full scentence.
-  {
-    Serial.print(gps.location.lat(), 8);
-    Serial.print(F(","));
-    Serial.print(gps.location.lng(), 8);
+    }
   }
 }
 
