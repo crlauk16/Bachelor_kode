@@ -1,15 +1,12 @@
 #include <TinyGPS++.h> // NMEA parsing: http://arduiniana.org
 #include <Wire.h>
 #include <I2C_Anything.h>
-#include <IridiumSBD.h>
 
-#define IridiumSerial Serial3
 #define GPSSerial Serial2
-#define IridiumBaud 19200
-#define GPSBaud 9600
-#define DIAGNOSTICS true
 
-IridiumSBD modem(IridiumSerial);
+#define GPSBaud 9600
+
+
 TinyGPSPlus tinygps;
 
 //Variabler som GPS posisjon og kurs lagres i.
@@ -33,32 +30,13 @@ boolean check = true;
 void setup()  
 {
   Serial.begin(9600);
-  IridiumSerial.begin(IridiumBaud);
   GPSSerial.begin(GPSBaud);
   Wire.begin(0x48);             // Gjør Arduinoen om til en I2C slave med adresse 0x48
   Wire.onRequest(requestEvent); // Når simulink ber om en posisjon kjøres requestEvent
-  
-  // Setup the Iridium modem
-  if (modem.begin() != ISBD_SUCCESS)
-  {
-    Serial.println("Couldn't begin modem operations.");
-    exit(0);
-  }
 }
 
 void loop() 
 {
-  unsigned long currentMillis1 = millis();
-  unsigned long currentMillis2 = millis();
-  
-
-  // IF-setning som sender posisjon via RockBLOCK
-  if (currentMillis1 - previousMillis1 >= interval1) 
-  {
-    sendMessage();
-    // Lagrer sist gang en melding ble sendt
-    previousMillis1 = currentMillis1;
-  }
 
   // While-loop som oppdaterer variablene som inneholder posisjon og kurs
   while (GPSSerial.available() > 0)
@@ -67,31 +45,6 @@ void loop()
     {
       updateInfo();   
     }
-  }
-
-  // Legger sammen de 25 siste målingene for å regne et gjennomsnitt
-  while (sample_count < NUM_SAMPLES && currentMillis2 - previousMillis2 >= interval2) 
-  {
-    sum += analogRead(A2);
-    sample_count++;
-    previousMillis2 = currentMillis2;
-  }
-  
-  voltage = ((float)sum / (float)NUM_SAMPLES * 5.030) / 1024.0;
-  double actualVoltage = voltage * 3.127659574;
-  //Serial.println(actualVoltage);
-  sample_count = 0;
-  sum = 0;
-
-  // Sjekker om spenningen er under 12.4V, hvis dette er sant skal RockBLOCK sende en melding
-  if (actualVoltage < 12.4 && check == true)
-  {
-    lowVoltage();
-    check = false;
-  }
-  else if (actualVoltage > 12.4 && check == false)
-  {
-    check = true;
   }
 }
 
@@ -213,53 +166,3 @@ void updateInfo()
     course2 = courseRad;
   }
 }
-
-// sendMessage vil sende posisjon i Longitude og Latitude, samt fart og kurs
-void sendMessage()
-{
-  char outBuffer[49]; //Sørger for at meldingen som sendes ikke overstiger 50 bytes
-  sprintf(outBuffer, "%s%u.%09lu,%s%u.%09lu,%lu,%ld", 
-    tinygps.location.rawLat().negative ? "-" : "",
-    tinygps.location.rawLat().deg,
-    tinygps.location.rawLat().billionths,
-    tinygps.location.rawLng().negative ? "-" : "",
-    tinygps.location.rawLng().deg,
-    tinygps.location.rawLng().billionths,
-    tinygps.speed.value() / 100,
-    tinygps.course.value() / 100);
-
-    Serial.print("Transmitting message '");
-    Serial.print(outBuffer);
-    Serial.println("'");
-
-//  int err = modem.sendSBDText(outBuffer);
-//  if (err != ISBD_SUCCESS)
-//  {
-//    Serial.print("Transmission failed with error code ");
-//    Serial.println(err);
-//  }
-}
-
-//Melding som sendes når batterispenningen er under 12.4V
-void lowVoltage()
-{
-  Serial.println("Transmitting message 'Warning, low battery'"); 
-//  int err = modem.sendSBDText("Warning, low battery");
-//  if (err != ISBD_SUCCESS)
-//  {
-//    Serial.print("Transmission failed with error code ");
-//    Serial.println(err);
-//  }
-}
-
-#if DIAGNOSTICS
-void ISBDConsoleCallback(IridiumSBD *device, char c)
-{
-  Serial.write(c);
-}
-
-void ISBDDiagsCallback(IridiumSBD *device, char c)
-{
-  Serial.write(c);
-}
-#endif
