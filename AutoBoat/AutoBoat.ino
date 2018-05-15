@@ -58,15 +58,6 @@ void loop()
   }
 
 
-  if (millis() > 5000 && tinygps.charsProcessed() < 10) // uh oh
-  {
-    Serial.println("ERROR: not getting any GPS data!");
-    // dump the stream to Serial
-    Serial.println("GPS stream dump:");
-    while (true) // infinite loop
-      if (GPSSerial.available() > 0) // any data coming in?
-        Serial.write(GPSSerial.read());
-  }
   // Debugging
   Serial.print("Fix: ");
   Serial.print(tinygps.sentencesWithFix());
