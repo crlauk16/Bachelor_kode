@@ -1,11 +1,11 @@
 #include <TinyGPS++.h>
 #include <Wire.h>
 #include <I2C_Anything.h>
-//#include <IridiumSBD.h>
+#include <IridiumSBD.h>
 
-//#define IridiumSerial Serial3
+#define IridiumSerial Serial3
 #define GPSSerial Serial2
-//#define IridiumBaud 19200
+#define IridiumBaud 19200
 #define GPSBaud 9600
 #define DIAGNOSTICS true
 
@@ -18,7 +18,7 @@ const float Pi = 3.1416;
 
 // Variables that defines the intervall between RockBLOCK messages
 unsigned long previousMillis1 = 0;        // Stores the time when the message last was sendt
-const long interval1 = 4500;           // Time between messages
+const long interval1 = 3600000;           // Time between messages
 
 void setup()  
 {
@@ -28,25 +28,25 @@ void setup()
   Wire.begin(0x48);                       // Defines this Arduino as an I2C slave with address 0x48
   Wire.onRequest(requestEvent);           // When Simulink requests data, requestEvent runs
   
-//  // Setup the Iridium modem
-//  if (modem.begin() != ISBD_SUCCESS)
-//  {
-//    Serial.println("Couldn't begin modem operations.");
-//    exit(0);
-//  }
+  // Setup the Iridium modem
+  if (modem.begin() != ISBD_SUCCESS)
+  {
+    Serial.println("Couldn't begin modem operations.");
+    exit(0);
+  }
 }
 
 void loop() 
 {
-  //unsigned long currentMillis1 = millis();
-  
+  unsigned long currentMillis1 = millis();
 
-  // Sending a message from the RockBLOCK at an one hour interval
-//  if (currentMillis1 - previousMillis1 >= interval1) 
-//  {
-//    sendMessage();
-//    previousMillis1 = currentMillis1;
-//  }
+
+// Sending a message from the RockBLOCK at an one hour interval
+  if (currentMillis1 - previousMillis1 >= interval1) 
+  {
+    sendMessage();
+    previousMillis1 = currentMillis1;
+  }
 
   // Update the variables which contains position and course
   while (GPSSerial.available() > 0)
@@ -56,17 +56,6 @@ void loop()
       updateInfo();   
     }
   }
-
-
-  // Debugging
-  Serial.print("Fix: ");
-  Serial.print(tinygps.sentencesWithFix());
-  Serial.print(" Failed: ");
-  Serial.print(tinygps.failedChecksum());
-  Serial.print(" Passed: ");
-  Serial.print(tinygps.passedChecksum());
-  Serial.print(" Chars: ");
-  Serial.println(tinygps.charsProcessed());
 }
 
 // requestEvent sends GPS location and course
@@ -197,40 +186,40 @@ void updateInfo()
   Serial.println(lngDec3);
 }
 
-// sendMessage will send position in longitude and latitude, as well as speed and course
-//void sendMessage()
-//{
-//  char outBuffer[49]; // Keeps the message under 50 bytes
-//  sprintf(outBuffer, "%s%u.%09lu,%s%u.%09lu,%lu,%ld", 
-//    tinygps.location.rawLat().negative ? "-" : "",
-//    tinygps.location.rawLat().deg,
-//    tinygps.location.rawLat().billionths,
-//    tinygps.location.rawLng().negative ? "-" : "",
-//    tinygps.location.rawLng().deg,
-//    tinygps.location.rawLng().billionths,
-//    tinygps.speed.value() / 100,
-//    tinygps.course.value() / 100);
-//
-//    Serial.print("Transmitting message '");
-//    Serial.print(outBuffer);
-//    Serial.println("'");
-//
-//  int err = modem.sendSBDText(outBuffer);
-//  if (err != ISBD_SUCCESS)
-//  {
-//    Serial.print("Transmission failed with error code ");
-//    Serial.println(err);
-//  }
-//}
-//
-//#if DIAGNOSTICS
-//void ISBDConsoleCallback(IridiumSBD *device, char c)
-//{
-//  Serial.write(c);
-//}
-//
-//void ISBDDiagsCallback(IridiumSBD *device, char c)
-//{
-//  Serial.write(c);
-//}
-//#endif
+ sendMessage will send position in longitude and latitude, as well as speed and course
+void sendMessage()
+{
+  char outBuffer[49]; // Keeps the message under 50 bytes
+  sprintf(outBuffer, "%s%u.%09lu,%s%u.%09lu,%lu,%ld", 
+    tinygps.location.rawLat().negative ? "-" : "",
+    tinygps.location.rawLat().deg,
+    tinygps.location.rawLat().billionths,
+    tinygps.location.rawLng().negative ? "-" : "",
+    tinygps.location.rawLng().deg,
+    tinygps.location.rawLng().billionths,
+    tinygps.speed.value() / 100,
+    tinygps.course.value() / 100);
+
+    Serial.print("Transmitting message '");
+    Serial.print(outBuffer);
+    Serial.println("'");
+
+  int err = modem.sendSBDText(outBuffer);
+  if (err != ISBD_SUCCESS)
+  {
+    Serial.print("Transmission failed with error code ");
+    Serial.println(err);
+  }
+}
+
+#if DIAGNOSTICS
+void ISBDConsoleCallback(IridiumSBD *device, char c)
+{
+  Serial.write(c);
+}
+
+void ISBDDiagsCallback(IridiumSBD *device, char c)
+{
+  Serial.write(c);
+}
+#endif
