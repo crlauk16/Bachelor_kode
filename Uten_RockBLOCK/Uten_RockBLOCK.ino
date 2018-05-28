@@ -1,54 +1,31 @@
-#include <TinyGPS++.h>
+#include <TinyGPS++.h> // NMEA parsing: http://arduiniana.org
 #include <Wire.h>
 #include <I2C_Anything.h>
-#include <IridiumSBD.h>
 
-#define IridiumSerial Serial3
 #define GPSSerial Serial2
-#define IridiumBaud 19200
-#define GPSBaud 9600
-#define DIAGNOSTICS true
 
-//IridiumSBD modem(IridiumSerial);
+#define GPSBaud 9600
+
+
 TinyGPSPlus tinygps;
 
-// Variables that stores GPS position and course
+//Variabler som GPS posisjon og kurs lagres i.
 int latHel, latDec1, latDec2, latDec3, lngHel, lngDec1, lngDec2, lngDec3, courseRad, course1, course2;
 const float Pi = 3.1416;
 
-// Variables that defines the intervall between RockBLOCK messages
-unsigned long previousMillis1 = 0;        // Stores the time when the message last was sendt
-const long interval1 = 3600000;           // Time between messages
 
 void setup()  
 {
   Serial.begin(9600);
-  //IridiumSerial.begin(IridiumBaud);
   GPSSerial.begin(GPSBaud);
-  Wire.begin(0x48);                       // Defines this Arduino as an I2C slave with address 0x48
-  Wire.onRequest(requestEvent);           // When Simulink requests data, requestEvent runs
-  
-  // Setup the Iridium modem
-  if (modem.begin() != ISBD_SUCCESS)
-  {
-    Serial.println("Couldn't begin modem operations.");
-    exit(0);
-  }
+  Wire.begin(0x48);             // Gjør Arduinoen om til en I2C slave med adresse 0x48
+  Wire.onRequest(requestEvent); // Når simulink ber om en posisjon kjøres requestEvent
 }
 
 void loop() 
 {
-  unsigned long currentMillis1 = millis();
 
-
-// Sending a message from the RockBLOCK at an one hour interval
-  if (currentMillis1 - previousMillis1 >= interval1) 
-  {
-    sendMessage();
-    previousMillis1 = currentMillis1;
-  }
-
-  // Update the variables which contains position and course
+  // While-loop som oppdaterer variablene som inneholder posisjon og kurs
   while (GPSSerial.available() > 0)
   {
     if (tinygps.encode(GPSSerial.read()))
@@ -56,9 +33,10 @@ void loop()
       updateInfo();   
     }
   }
+
 }
 
-// requestEvent sends GPS location and course
+// requestEvent sender GPS-posisjon og kurs over I2C
 void requestEvent()
 {
   I2C_writeAnything (latHel);
@@ -73,12 +51,12 @@ void requestEvent()
   I2C_writeAnything (course2);
 }
 
-// updateInfo updates the info which is stored in the position and course variables
+// updateInfo oppdaterer infoen som ligger i posisjon og kurs variablene
 void updateInfo()
 {
   unsigned long loopStartTime = millis();
   
-  // Looking for a GPS signal for a maximum of 7 minutes
+  // Leter etter GPS signal i opp til 7 minutter
   while ((!tinygps.location.isValid() || !tinygps.date.isValid()) && 
     millis() - loopStartTime < 7UL * 60UL * 1000UL)
   {
@@ -92,7 +70,7 @@ void updateInfo()
     return;
   }
 
-  // Stores Latitude in a buffer outBufferLat
+  // Lagrer Latitude i et buffer outBufferLat
   char outBufferLat[12];
   sprintf(outBufferLat, "%s%u%09lu",
 
@@ -100,7 +78,7 @@ void updateInfo()
   tinygps.location.rawLat().deg,
   tinygps.location.rawLat().billionths);
 
-  // Stores Longitude in a buffer outBufferLng
+  // Lagrer Longitude i et buffer outBufferLng
   char outBufferLng[12];
   sprintf(outBufferLng, "%s%u%09lu",
 
@@ -108,7 +86,7 @@ void updateInfo()
   tinygps.location.rawLng().deg,
   tinygps.location.rawLng().billionths);
 
-  // Recalculates outBufferLat into four ints
+  // Gjør om outBufferLat til fire ints
   latHel = outBufferLat[0] - 48;
   for (int i = 1; i < 2; i++)
   {
@@ -134,7 +112,7 @@ void updateInfo()
   }
 
 
-  // Recalculates outBufferLng into four ints
+  // Gjør om outBufferLng til fire ints
   lngHel = outBufferLng[0] - 48;
   for (int i = 1; i < 1; i++)
   {
@@ -159,7 +137,7 @@ void updateInfo()
      lngDec3 = lngDec3 * 10 + outBufferLng[i] - 48;
   }
 
-  // Recalculates the course into one or two ints
+  // Gjør om kursen til 1-2 ints
   float courseDeg = tinygps.course.deg();
   float courseTempRad = courseDeg * (Pi/180);
   courseTempRad = (courseTempRad * 100) + 0.5;
@@ -175,6 +153,8 @@ void updateInfo()
     course1 = 0;
     course2 = courseRad;
   }
+
+
   Serial.print(latHel);
   Serial.print(latDec1);
   Serial.print(latDec2);
@@ -185,41 +165,3 @@ void updateInfo()
   Serial.print(lngDec2);
   Serial.println(lngDec3);
 }
-
-// sendMessage will send position in longitude and latitude, as well as speed and course
-void sendMessage()
-{
-  char outBuffer[49]; // Keeps the message under 50 bytes
-  sprintf(outBuffer, "%s%u.%09lu,%s%u.%09lu,%lu,%ld", 
-    tinygps.location.rawLat().negative ? "-" : "",
-    tinygps.location.rawLat().deg,
-    tinygps.location.rawLat().billionths,
-    tinygps.location.rawLng().negative ? "-" : "",
-    tinygps.location.rawLng().deg,
-    tinygps.location.rawLng().billionths,
-    tinygps.speed.value() / 100,
-    tinygps.course.value() / 100);
-
-    Serial.print("Transmitting message '");
-    Serial.print(outBuffer);
-    Serial.println("'");
-
-  int err = modem.sendSBDText(outBuffer);
-  if (err != ISBD_SUCCESS)
-  {
-    Serial.print("Transmission failed with error code ");
-    Serial.println(err);
-  }
-}
-
-#if DIAGNOSTICS
-void ISBDConsoleCallback(IridiumSBD *device, char c)
-{
-  Serial.write(c);
-}
-
-void ISBDDiagsCallback(IridiumSBD *device, char c)
-{
-  Serial.write(c);
-}
-#endif
